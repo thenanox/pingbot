@@ -5,7 +5,7 @@ const { status, json } = server.reply;
 const Signal = require('./signal');
 
 const PORT = process.env.PORT || 5000
-
+const signalsCache = [];
 module.exports = server({ security: { csrf: false }, port: PORT }, [
   get('/', ctx => 'Hello world'),
   post('/ping', ctx => {
@@ -16,7 +16,17 @@ module.exports = server({ security: { csrf: false }, port: PORT }, [
       return status('400');
     }
     const signal = new Signal(ctx.data);
-    signal.prettyPrint();
+    signalsCache.push(signal);
+    if(signalsCache.length >= 100) {
+      signalsCache.shift();
+    }
+    console.log(signalsCache);
     return 'pong';
+  }),
+  get('/signals', ctx => {
+    console.log(signalsCache);
+    const result = signalsCache.map(signal => signal.prettyPrinted());
+    console.log(result);
+    return json(result);
   })
 ]);
