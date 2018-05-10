@@ -2,7 +2,7 @@
 const server = require('server');
 const { get, post } = server.router;
 const { status, json } = server.reply;
-const Signal = require('./Signal');
+const Signal = require('./signal');
 
 const PORT = process.env.PORT || 5000
 
