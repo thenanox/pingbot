@@ -20,13 +20,14 @@ module.exports = server({ security: { csrf: false }, port: PORT }, [
     if(signalsCache.length >= 100) {
       signalsCache.shift();
     }
-    console.log(signalsCache);
     return 'pong';
   }),
   get('/signals', ctx => {
-    console.log(signalsCache);
     const result = signalsCache.map(signal => signal.prettyPrinted());
-    console.log(result);
     return json(result);
+  }),
+  get('/signals/clear', ctx => {
+    signalsCache.length = 0;
+    return json('History has been cleared!');
   })
 ]);
