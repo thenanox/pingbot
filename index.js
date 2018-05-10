@@ -4,7 +4,7 @@ const { get, post } = server.router;
 const { status, json } = server.reply;
 const Signal = require('./Signal');
 
-module.exports = server({ security: { csrf: false }, port: 8080 }, [
+module.exports = server({ security: { csrf: false }, port: 80 }, [
   get('/', ctx => 'Hello world'),
   post('/ping', ctx => {
     if(ctx.headers['user-agent'] !== 'CryptoPingAPI/0.1.0') {
