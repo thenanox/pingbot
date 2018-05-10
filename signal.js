@@ -14,17 +14,17 @@ module.exports = class Signal {
      this['trend_factor'] = json['trend_factor'];
   }
   prettyPrint(){
-     console.log('btc_usd', this['btc_usd']);
-     console.log('count', this['count']);
-     console.log('created_at', this['created_at']);
-     console.log('exchange', this['exchange']);
-     console.log('price_btc', this['price_btc']);
-     console.log('price_pct_change', this['price_pct_change']);
-     console.log('ticker', this['ticker']);
-     console.log('type', this['type']);
-     console.log('volume_btc_change', this['volume_btc_change']);
-     console.log('volume_pct_change', this['volume_pct_change']);
-     console.log('early_factor', this['early_factor']);
-     console.log('trend_factor', this['trend_factor']);
+     console.log('#'+this['ticker'], "EARLY:",this['early_factor'],"TREND:",this['trend_factor']);
+     console.log(this['type'], "signal on", this['exchange']);
+     if(this['type'] === 'up') {
+      console.log("+"+ this['volume_pct_change']+"%,", "buy vol. incr. by", this['volume_btc_change']);
+      console.log("+"+ this['price_pct_change']+"%,", "price:", this['price_btc']);
+     } else {
+      console.log("+"+ this['volume_pct_change']+"%,", "sell vol. incr. by", this['volume_btc_change']);
+      console.log("-"+ this['price_pct_change']+"%,", "price:", this['price_btc']);;
+     }
+     console.log('Signals', this['count']+'/7d');
+     console.log('Created at:', this['created_at']);
+     console.log('With bitcoin value:', this['btc_usd']);
   }
 }
