@@ -15,6 +15,9 @@ module.exports = server({ security: { csrf: false }, port: PORT }, [
   get('/', ctx => 'Hello world'),
   post('/', ctx => {
     console.log('headers', ctx.headers);
+    if(ctx.headers['user-agent'] !== 'CryptoPingAPI/0.1.1') {
+      return status('400');
+    }
     console.log('body', ctx.data);
     if(!ctx.data) {
       return status('400');

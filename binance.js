@@ -80,7 +80,7 @@ let strategies = [
 	{ name: "TEST", condition: test}
 ]
 
-binance.options({ 'APIKEY': APIKEY, 'APISECRET': APISECRET, 'reconnect': true, test: paperTrade });
+binance.options({ 'APIKEY': APIKEY, 'APISECRET': APISECRET, 'reconnect': true, useServerTime: true, test: paperTrade });
 
 async function run() {
 	console.log('## Trading initialization started ##')	
@@ -374,6 +374,8 @@ function open(signal) {
 	const quote = wallet.filter( balance => balance.asset === pair);
 	console.log('btc', btc),
 	console.log('pair', quote);
+	//Check price is not so much lower
+	//Check volume against day
 	if(quote.length > 0) {
 
 	} else {
@@ -381,7 +383,6 @@ function open(signal) {
 		const balance = numeral(btc.free);
 		const defaultTrade = 0.02;		
 		if(balance.value() > defaultTrade) { 
-			// for now use 0.01 btc trades to test
 			const price = signal.price_btc;
 			const quantity = numeral(defaultTrade).divide(price).format("0")
 			console.log('With 0.2 btc', quantity, price);
@@ -392,15 +393,15 @@ function open(signal) {
 				console.log("order id: " + response.orderId);
 				const sub = numeral(price).multiply(0.025).value();
 				console.log('sub', sub);
-				const stopPrice = numeral(price).subtract(sub).value();
+				const stopPrice = numeral(price).subtract(sub).format("0.00000000");
 				console.log('stopPrice', stopPrice);
-				binance.sell(pair+"BTC", quantity, price, {stopPrice: stopPrice, type:  "STOP_LOSS"}, (error, response) => {
+				binance.sell(pair+"BTC", quantity, stopPrice, {stopPrice: stopPrice, type: "STOP_LOSS_LIMIT"}, (error, response) => {
 					if(error) console.log('error', error.body)
 					console.log("Stop loss response", response);
 					console.log("order id: " + response.orderId);
 					const add = numeral(price).multiply(0.05).value();
 					console.log('add', add);
-					const sellLimit = numeral(price).add(add).value();
+					const sellLimit = numeral(price).add(add).format("0.00000000");
 					console.log('sellLimit', sellLimit);
 					binance.sell(pair+"BTC", quantity, sellLimit, {type:'LIMIT'}, (error, response) => {
 						if(error) console.log('error', error.body)
