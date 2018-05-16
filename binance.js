@@ -317,7 +317,6 @@ trackFutureMinutePrices = (pair) => {
 								+ " C:" + close 
 								+ " D:%" + numeral(diff[symbol]).format("0.000") 
 								+ " https://www.binance.com/tradeDetail.html?symbol=" + symbol.slice(0, -3) + "_BTC")
-							if (sound_alert) load('./alert.mp3').then(play)
 							if ( typeof tracked_data[symbol] === 'undefined' ) {
 								tracked_data[symbol] = {}
 							}
@@ -358,7 +357,6 @@ trackFutureMinutePrices = (pair) => {
 								+ " C:" + close 
 								+ " D:%" + numeral(diff[symbol]).format("0.000") 
 								+ " https://www.binance.com/tradeDetail.html?symbol=" + symbol.slice(0, -3) + "_BTC")
-							if (sound_alert) load('./alert.mp3').then(play)
 							tracked_pairs = tracked_pairs.filter(o => !( (o.strat === strat.name) && (o.symbol === symbol) ))
 						}
 					} 
