@@ -2,10 +2,15 @@
 const server = require('server');
 const { get, post } = server.router;
 const { status, json } = server.reply;
+require('dotenv').load();
+
 const Signal = require('./signal');
+const trader = require('./binance');
 
 const PORT = process.env.PORT || 5000
 const signalsCache = [];
+
+trader.run();
 module.exports = server({ security: { csrf: false }, port: PORT }, [
   get('/', ctx => 'Hello world'),
   post('/ping', ctx => {
@@ -19,6 +24,11 @@ module.exports = server({ security: { csrf: false }, port: PORT }, [
     signalsCache.push(signal);
     if(signalsCache.length >= 100) {
       signalsCache.shift();
+    }
+    if(signal.type === 'up') {
+      trader.open(signal);
+    } else {
+      trader.close(signal);
     }
     return 'pong';
   }),
