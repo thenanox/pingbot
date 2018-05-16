@@ -1,7 +1,8 @@
 const binance = require('node-binance-api'),
 _ = require('lodash'),
 moment = require('moment'),
-numeral = require('numeral');
+numeral = require('numeral'),
+math = require('mathjs');
 
 const APIKEY = process.env.APIKEY;
 const APISECRET = process.env.APISECRET;
@@ -96,12 +97,12 @@ async function run() {
 	await sleep(waitTime)	
 	pairs = await BTCPairs();
 	pairs = pairs.slice(0, maxTrackedPairs) 
-	await sleep(waitTime)
-	await trackDepthData()
-	await sleep(waitTime)
-	await getHourlyPrevPrices()
-	await sleep(waitTime)
-	await trackMinutePrices()
+	// await sleep(waitTime)
+	// await trackDepthData()
+	// await sleep(waitTime)
+	// await getHourlyPrevPrices()
+	// await sleep(waitTime)
+	// await trackMinutePrices()
 	console.log('## Trading initialization complete ##')
 }
 
@@ -145,7 +146,8 @@ async function loadExchangeInfo() {
 async function loadWallet() {
 	return new Promise(resolve => {
 		binance.account( (error, account) => {
-			resolve(account.balances.filter(balance => balance.free !== '0.00000000' || balance.locked !== '0.00000000'));
+			resolve(account.balances.filter(balance => balance.free !== '0.00000000' || balance.locked !== '0.00000000')
+				.map(balance => {balance.free = parseFloat(balance.free); balance.locked = parseFloat(balance.locked); return balance;}));
 		})
 	})
 }
@@ -368,41 +370,35 @@ trackFutureMinutePrices = (pair) => {
 }
 
 function open(signal) {
-	console.log('signal', signal)
 	const pair = signal.ticker;
 	const btc = wallet.filter( balance => balance.asset === 'BTC')[0];
 	const quote = wallet.filter( balance => balance.asset === pair);
-	console.log('btc', btc),
-	console.log('pair', quote);
 	//Check price is not so much lower
 	//Check volume against day
 	if(quote.length > 0) {
 
 	} else {
 		//Obtain 
-		const balance = numeral(btc.free);
-		const defaultTrade = 0.02;		
-		if(balance.value() > defaultTrade) { 
-			const price = signal.price_btc;
-			const quantity = numeral(defaultTrade).divide(price).format("0")
-			console.log('With 0.2 btc', quantity, price);
+		if(btc.free > 0.02) { 
+			const {quantity:quantity, price:price} = calculateCoinInfo(info[pair+"BTC"], signal);
+			console.log('Buy', pair, quantity, price);
 			//Risk reward 1/2
 			binance.buy(pair+"BTC", quantity, price, {type:'LIMIT'}, (error, response) => {
-				if(error) console.log('error', error.body)
+				if(error) console.log('error', error.body)				
 				console.log("Limit Buy response", response);
 				console.log("order id: " + response.orderId);
-				const sub = numeral(price).multiply(0.025).value();
-				console.log('sub', sub);
-				const stopPrice = numeral(price).subtract(sub).format("0.00000000");
-				console.log('stopPrice', stopPrice);
-				binance.sell(pair+"BTC", quantity, stopPrice, {stopPrice: stopPrice, type: "STOP_LOSS_LIMIT"}, (error, response) => {
+				const sub = math.round(price * 0.025, 8);
+				const sell = math.round(price * 0.026, 8);
+				const stopPrice = checkPrice(info[pair+"BTC"], math.subtract(price,sub));
+				const sellPrice = checkPrice(info[pair+"BTC"], math.subtract(price,sell));
+				console.log('Stop loss', pair, stopPrice, sellPrice);
+				binance.sell(pair+"BTC", quantity, sellPrice, {stopPrice: stopPrice, type: "STOP_LOSS_LIMIT"}, (error, response) => {
 					if(error) console.log('error', error.body)
 					console.log("Stop loss response", response);
 					console.log("order id: " + response.orderId);
-					const add = numeral(price).multiply(0.05).value();
-					console.log('add', add);
-					const sellLimit = numeral(price).add(add).format("0.00000000");
-					console.log('sellLimit', sellLimit);
+					const add = math.round(price * 0.05, 8);
+					const sellLimit = checkPrice(info[pair+"BTC"], math.sum(price,add));
+					console.log('Sell limit', pair, sellLimit);
 					binance.sell(pair+"BTC", quantity, sellLimit, {type:'LIMIT'}, (error, response) => {
 						if(error) console.log('error', error.body)
 						console.log("Stop loss response", response);
@@ -411,6 +407,46 @@ function open(signal) {
 				});				
 			});
 		}
+	}
+}
+
+function isEpsilon(number){
+	return Math.abs(number) < 1e-10;
+}
+
+function calculateCoinInfo(info, signal) {
+	const price = checkPrice(info, signal.price_btc);
+	const quantity = checkQuantity(info, signal.price_btc);
+	checkMinNotional(info, price, quantity);
+	return {price:price, quantity:quantity};
+}
+
+function checkPrice(info, price) {
+	const roundedPrice = binance.roundStep(price, info.tickSize);
+	if(roundedPrice >= info.minPrice && roundedPrice <= info.maxPrice && isEpsilon(math.mod(math.subtract(roundedPrice,info.minPrice), info.tickSize))) {
+		return roundedPrice;
+	} else {
+		throw "Not valid price";
+	}
+}
+
+function checkQuantity(info, price) {
+	let quantity;
+	if(info.stepSize !== 1) {
+		quantity = binance.roundStep(0.02 / price, info.stepSize);
+	} else {
+		quantity = math.round(0.02 / price, 0);
+	}
+	if(quantity >= info.minQty && quantity <= info.maxQty && isEpsilon(math.mod(math.round(quantity-info.minQty, 8), info.stepSize))) {
+		return quantity;
+	} else {
+		throw "Not valid quantity";
+	}
+}
+
+function checkMinNotional(info, minPrice, minQty) {
+	if(minPrice * minQty < info.minNotional) {
+		throw "Not valid transaction";		
 	}
 }
 
