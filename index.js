@@ -13,7 +13,7 @@ const signalsCache = [];
 trader.run();
 module.exports = server({ security: { csrf: false }, port: PORT }, [
   get('/', ctx => 'Hello world'),
-  post('/ping', ctx => {
+  post('/', ctx => {
     if(ctx.headers['user-agent'] !== 'CryptoPingAPI/0.1.0') {
       return status('400');
     }
