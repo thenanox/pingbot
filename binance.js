@@ -94,7 +94,8 @@ async function run() {
 	await sleep(waitTime)	
 	btcPrice = await BTCPrice()
 	await sleep(waitTime)	
-	pairs = await BTCPairs().slice(0, maxTrackedPairs) 
+	pairs = await BTCPairs();
+	pairs = pairs.slice(0, maxTrackedPairs) 
 	await sleep(waitTime)
 	await trackDepthData()
 	await sleep(waitTime)
