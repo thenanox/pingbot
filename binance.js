@@ -14,6 +14,8 @@ const waitTime = 1000;
 const trading_fee = 0.05; 		// 0.1 normal, 0.05 BNB
 const maxBTC = 0.2;
 const paperTrade = true;
+const reward = 0.04;					// percentage for sell limit
+const risk = 0.02							// percentage for stop loss
 
 // Globals
 let btcPrice = 0;
@@ -390,8 +392,8 @@ function open(signal) {
 				if(error) console.log('error', error.body)				
 				console.log("Limit Buy response", response);
 				console.log("order id: " + response.orderId);
-				const sub = math.round(price * 0.025, 8);
-				const sell = math.round(price * 0.026, 8);
+				const sub = math.round(price * risk, 8);
+				const sell = math.round(price * (risk+0.01), 8);
 				const stopPrice = checkPrice(info[pair+"BTC"], math.subtract(price,sub));
 				const sellPrice = checkPrice(info[pair+"BTC"], math.subtract(price,sell));
 				console.log('Stop loss', pair, stopPrice, sellPrice);
@@ -399,7 +401,7 @@ function open(signal) {
 					if(error) console.log('error', error.body)
 					console.log("Stop loss response", response);
 					console.log("order id: " + response.orderId);
-					const add = math.round(price * 0.05, 8);
+					const add = math.round(price * reward, 8);
 					const sellLimit = checkPrice(info[pair+"BTC"], math.sum(price,add));
 					console.log('Sell limit', pair, sellLimit);
 					binance.sell(pair+"BTC", quantity, sellLimit, {type:'LIMIT'}, (error, response) => {
