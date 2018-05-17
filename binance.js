@@ -371,6 +371,9 @@ trackFutureMinutePrices = (pair) => {
 
 function open(signal) {
 	const pair = signal.ticker;
+	if(wallet.length === 0) {
+		throw new Error("Wallet still not prepared");
+	}
 	const btc = wallet.filter( balance => balance.asset === 'BTC')[0];
 	const quote = wallet.filter( balance => balance.asset === pair);
 	//Check price is not so much lower
