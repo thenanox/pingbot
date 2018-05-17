@@ -97,12 +97,12 @@ async function run() {
 	await sleep(waitTime)	
 	pairs = await BTCPairs();
 	pairs = pairs.slice(0, maxTrackedPairs) 
-	// await sleep(waitTime)
-	// await trackDepthData()
-	// await sleep(waitTime)
-	// await getHourlyPrevPrices()
-	// await sleep(waitTime)
-	// await trackMinutePrices()
+	await sleep(waitTime)
+	await trackDepthData()
+	await sleep(waitTime)
+	await getHourlyPrevPrices()
+	await sleep(waitTime)
+	await trackMinutePrices()
 	console.log('## Trading initialization complete ##')
 }
 
