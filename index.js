@@ -1,6 +1,6 @@
 // Include it and extract some methods for convenience
 const server = require('server');
-const { get, post } = server.router;
+const { get, post, error } = server.router;
 const { status, json } = server.reply;
 require('dotenv').load();
 
@@ -41,5 +41,6 @@ module.exports = server({ security: { csrf: false }, port: PORT }, [
   get('/signals/clear', ctx => {
     signalsCache.length = 0;
     return json('History has been cleared!');
-  })
+  }),
+  error(ctx => status(500).send(ctx.error.message))
 ]);

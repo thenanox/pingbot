@@ -123,13 +123,13 @@ async function loadExchangeInfo() {
 					if ( filter.filterType == "MIN_NOTIONAL" ) {
 						filters.minNotional = filter.minNotional;
 					} else if ( filter.filterType == "PRICE_FILTER" ) {
-						filters.minPrice = filter.minPrice;
-						filters.maxPrice = filter.maxPrice;
+						filters.minPrice = parseInt(filter.minPrice);
+						filters.maxPrice = parseInt(filter.maxPrice);
 						filters.tickSize = filter.tickSize;
 					} else if ( filter.filterType == "LOT_SIZE" ) {
 						filters.stepSize = filter.stepSize;
-						filters.minQty = filter.minQty;
-						filters.maxQty = filter.maxQty;
+						filters.minQty = parseInt(filter.minQty);
+						filters.maxQty = parseInt(filter.maxQty);
 					}
 				}
 				filters.baseAssetPrecision = obj.baseAssetPrecision;
@@ -410,10 +410,6 @@ function open(signal) {
 	}
 }
 
-function isEpsilon(number){
-	return Math.abs(number) < 1e-10;
-}
-
 function calculateCoinInfo(info, signal) {
 	const price = checkPrice(info, signal.price_btc);
 	const quantity = checkQuantity(info, signal.price_btc);
@@ -423,10 +419,10 @@ function calculateCoinInfo(info, signal) {
 
 function checkPrice(info, price) {
 	const roundedPrice = binance.roundStep(price, info.tickSize);
-	if(roundedPrice >= info.minPrice && roundedPrice <= info.maxPrice && isEpsilon(math.mod(math.subtract(roundedPrice,info.minPrice), info.tickSize))) {
+	if(roundedPrice >= info.minPrice && roundedPrice <= info.maxPrice && math.mod(math.subtract(roundedPrice,info.minPrice), info.tickSize) < info.tickSize) {
 		return roundedPrice;
 	} else {
-		throw "Not valid price";
+		throw new Error("Not valid price");
 	}
 }
 
@@ -437,16 +433,16 @@ function checkQuantity(info, price) {
 	} else {
 		quantity = math.round(0.02 / price, 0);
 	}
-	if(quantity >= info.minQty && quantity <= info.maxQty && isEpsilon(math.mod(math.round(quantity-info.minQty, 8), info.stepSize))) {
+	if(quantity >= info.minQty && quantity <= info.maxQty && math.mod(math.subtract(quantity,info.minQty), info.stepSize) < info.stepSize) {
 		return quantity;
 	} else {
-		throw "Not valid quantity";
+		throw new Error("Not valid quantity");
 	}
 }
 
 function checkMinNotional(info, minPrice, minQty) {
 	if(minPrice * minQty < info.minNotional) {
-		throw "Not valid transaction";		
+		throw new Error("Not valid transaction");
 	}
 }
 
