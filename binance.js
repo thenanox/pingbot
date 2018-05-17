@@ -35,51 +35,16 @@ let wallet = [];
 let info = {};
 let pairs = []
 
-// Strategies
-buying_up_trend = (pair) => {
-	const ma_s = 3
-	const ma_m = 13
-	const ma_l = 99
-	const ma_h_s = hourly[pair].slice(0,ma_s).reduce((sum, price) => (sum + parseFloat(price)), 0) / parseFloat(hourly[pair].slice(0,ma_s).length)
-	const ma_h_m = hourly[pair].slice(0,ma_m).reduce((sum, price) => (sum + parseFloat(price)), 0) / parseFloat(hourly[pair].slice(0,ma_m).length)
-	const ma_h_l = hourly[pair].slice(0,ma_l).reduce((sum, price) => (sum + parseFloat(price)), 0) / parseFloat(hourly[pair].slice(0,ma_l).length)
-	const ma_m_s = minute[pair].slice(0,ma_s).reduce((sum, price) => (sum + parseFloat(price)), 0) / parseFloat(minute[pair].slice(0,ma_s).length)
-	const ma_m_m = minute[pair].slice(0,ma_m).reduce((sum, price) => (sum + parseFloat(price)), 0) / parseFloat(minute[pair].slice(0,ma_m).length)
-	const ma_m_l = minute[pair].slice(0,ma_l).reduce((sum, price) => (sum + parseFloat(price)), 0) / parseFloat(minute[pair].slice(0,ma_l).length)
-	if ( (ma_h_s >= ma_h_m) && (ma_h_m >= ma_h_l) && (ma_m_s >= ma_m_m) && (ma_m_m >= ma_m_l) ) { 
-		return "BUY"
-	}
-	else {
-		return "SELL"
-	}
-}
-
-buying_low_diff = (pair) => {
-	const max_ask_bid_ratio = 3.0 	// asks/bids < max_ask_bid_ratio
-	const min_depth_volume = 2.0  	// btc
-	const max_diff = 0.003 	// pourcent(ask-bid/bid)
-	if ( (parseFloat(bids[pair])>=(parseFloat(asks[pair])*max_ask_bid_ratio)) 
-		&& (parseFloat(bids[pair])>=min_depth_volume) 
-		&& (parseFloat(diff[pair])<=parseFloat(max_diff)) ) { 
-		return "BUY"
-	}
-	else {
-		return "SELL"
-	}
-}
-
 test = (pair) => {
 	const rand = Math.random();
 	if(rand > 0.6) {
-		return "BUY";
+		return false;
 	} else if (rand < 0.6){
-		return "SELL";
+		return true;
 	}
 }
 
-let strategies = [ 
-	{ name: "UP_TREND", condition: buying_up_trend }, 
-	{ name: "LOW_diff", condition: buying_low_diff },
+let sellStrategies = [ 
 	{ name: "TEST", condition: test}
 ]
 
@@ -288,12 +253,14 @@ trackFutureMinutePrices = (pair) => {
 		binance.websockets.candlesticks([pair], "1m", (candlesticks) => {
 			let { e:eventType, E:eventTime, s:symbol, k:ticks } = candlesticks
 			let { o:open, h:high, l:low, c:close, v:volume, n:trades, i:interval, x:isFinal, q:quoteVolume, V:buyVolume, Q:quoteBuyVolume } = ticks
-			strategies.map( strat => {
-				var tracked_index = _.findIndex(tracked_pairs, (o) => { return ( (o.strat === strat.name) && (o.symbol === pair) )})
+			sellStrategies.map( strat => {
+				var tracked_index = _.findIndex(tracked_pairs, (o) => o.symbol === pair);
 				if ( tracked_index > -1) {
-					tracked_data[symbol][strat.name].push({ 
+					tracked_data[symbol].push({ 
 						date: moment().format('h:mm:ss a'),
 						price: close,
+						volume: volume,
+						accumulatedVolume: accumulatedVolume + volume,
 						asks: parseFloat(asks[symbol]),
 						bids: parseFloat(bids[symbol]),
 						diff: parseFloat(diff[symbol]),
@@ -309,59 +276,14 @@ trackFutureMinutePrices = (pair) => {
 					hourly[symbol].unshift(close) 
 					if (symbol==="ETHBTC") { console.log("# " + moment().format('h:mm:ss') + " - new hourly price added #") }
 				}
-				strategies.map( strat => { 
-					const stratResult = strat.condition(symbol);
-					if (stratResult === "BUY") {
-						var tracked_index = _.findIndex(tracked_pairs, (o) => { return ( (o.strat === strat.name) && (o.symbol === symbol) )})
-						if ( tracked_index === -1 ) {
-							console.log("# " + moment().format('h:mm:ss') + " :: " + symbol 
-								+ " BUY :: " + strat.name + " :: "
-								+ " A:" + numeral(asks[symbol]).format("0.00") 
-								+ " B:" + numeral(bids[symbol]).format("0.00") 
-								+ " C:" + close 
-								+ " D:%" + numeral(diff[symbol]).format("0.000") 
-								+ " https://www.binance.com/tradeDetail.html?symbol=" + symbol.slice(0, -3) + "_BTC")
-							if ( typeof tracked_data[symbol] === 'undefined' ) {
-								tracked_data[symbol] = {}
-							}
-							tracked_data[symbol][strat.name] = []
-							tracked_pairs.push({ 
-								symbol: symbol, 
-								date: moment().format('MMMM Do YYYY, h:mm:ss a'),
-								timestamp: Date.now(),
-								price: close,
-								volume: volume,
-								usdvolume: volume*close*btcPrice,
-								strat: strat.name
-							})
-						}
-					} 
-					if (stratResult === "SELL") {
-						var tracked_index = _.findIndex(tracked_pairs, (o) => { return ( (o.strat === strat.name) && (o.symbol === symbol) )})
+				sellStrategies.map( strat => { 
+					if (strat.condition(symbol)) {
+						var tracked_index = _.findIndex(tracked_pairs, (o) => o.symbol === symbol)
 						if ( tracked_index > -1) {
-							if ( typeof total_pnl[strat.name] === 'undefined' ) {
-								total_pnl[strat.name] = []
-							}
-							total_pnl[strat.name].unshift({ 
-								symbol: symbol, 
-								date: moment().format('MMMM Do YYYY, h:mm:ss a'),
-								timestamp: Date.now(),
-								pnl: 100.00*(
-									((parseFloat(close) - parseFloat(close)*trading_fee*0.01)-
-									(parseFloat(tracked_pairs[tracked_index].price) + parseFloat(tracked_pairs[tracked_index].price)*trading_fee*0.01))
-									/parseFloat(close))
-							})
-							console.log("# " + moment().format('h:mm:ss') + " :: " + symbol 
-								+ " SELL :: " + strat.name + " :: "
-								+ " max:%" + numeral(100.00*(parseFloat((_.maxBy(tracked_data[symbol][strat.name], 'price').price)/parseFloat(tracked_pairs[tracked_index].price))-1)).format("0.000") 
-								+ " pnl:%" + numeral(total_pnl[strat.name][0].pnl).format("0.000") 
-								+ " tpnl:%" + numeral(_.sumBy(total_pnl[strat.name], 'pnl')).format("0.000") 
-								+ " ::  A:" + numeral(asks[symbol]).format("0.00") 
-								+ " B:" + numeral(bids[symbol]).format("0.00") 
-								+ " C:" + close 
-								+ " D:%" + numeral(diff[symbol]).format("0.000") 
-								+ " https://www.binance.com/tradeDetail.html?symbol=" + symbol.slice(0, -3) + "_BTC")
-							tracked_pairs = tracked_pairs.filter(o => !( (o.strat === strat.name) && (o.symbol === symbol) ))
+							console.log('Symbol', symbol);
+							console.log('data', JSON.stringify(tracked_data[symbol],null,2));
+							tracked_data[symbol].length = -1;
+							tracked_pairs = tracked_pairs.filter(o => !(o.symbol === symbol))
 						}
 					} 
 				})
@@ -372,47 +294,71 @@ trackFutureMinutePrices = (pair) => {
 }
 
 function open(signal) {
-	const pair = signal.ticker;
-	if(wallet.length === 0) {
-		throw new Error("Wallet still not prepared");
-	}
-	const btc = wallet.filter( balance => balance.asset === 'BTC')[0];
-	const quote = wallet.filter( balance => balance.asset === pair);
-	//Check price is not so much lower
-	//Check volume against day
-	if(quote.length > 0) {
+	return new Promise(resolve => {
+		const result = {};
+		const pair = signal.ticker;
+		result.pair = pair;
+		if(wallet.length === 0) {
+			throw new Error("Wallet still not prepared");
+		}
+		const btc = wallet.filter( balance => balance.asset === 'BTC')[0];
+		const quote = wallet.filter( balance => balance.asset === pair);
+		//Check price is not so much lower
+		//Check volume against day
+		if(quote.length > 0) {
 
-	} else {
-		//Obtain 
-		if(btc.free > 0.02) { 
-			const {quantity:quantity, price:price} = calculateCoinInfo(info[pair+"BTC"], signal);
-			console.log('Buy', pair, quantity, price);
-			//Risk reward 1/2
-			binance.buy(pair+"BTC", quantity, price, {type:'LIMIT'}, (error, response) => {
-				if(error) console.log('error', error.body)				
-				console.log("Limit Buy response", response);
-				console.log("order id: " + response.orderId);
-				const sub = math.round(price * risk, 8);
-				const sell = math.round(price * (risk+0.01), 8);
-				const stopPrice = checkPrice(info[pair+"BTC"], math.subtract(price,sub));
-				const sellPrice = checkPrice(info[pair+"BTC"], math.subtract(price,sell));
-				console.log('Stop loss', pair, stopPrice, sellPrice);
-				binance.sell(pair+"BTC", quantity, sellPrice, {stopPrice: stopPrice, type: "STOP_LOSS_LIMIT"}, (error, response) => {
-					if(error) console.log('error', error.body)
-					console.log("Stop loss response", response);
+		} else {
+			//Obtain 
+			if(btc.free > 0.02) { 
+				const {quantity:quantity, price:price} = calculateCoinInfo(info[pair+"BTC"], signal);
+				console.log('Buy', pair, quantity, price);
+				//Risk reward 1/2
+				binance.buy(pair+"BTC", quantity, price, {type:'LIMIT'}, (error, response) => {
+					if(error) console.log('error', error.body)				
+					console.log("Limit Buy response", response);
 					console.log("order id: " + response.orderId);
-					const add = math.round(price * reward, 8);
-					const sellLimit = checkPrice(info[pair+"BTC"], math.sum(price,add));
-					console.log('Sell limit', pair, sellLimit);
-					binance.sell(pair+"BTC", quantity, sellLimit, {type:'LIMIT'}, (error, response) => {
+					const buyOrder = response.orderId;
+					result.buy = price;
+					const sub = math.round(price * risk, 8);
+					const sell = math.round(price * (risk+0.01), 8);
+					const stopPrice = checkPrice(info[pair+"BTC"], math.subtract(price,sub));
+					const sellPrice = checkPrice(info[pair+"BTC"], math.subtract(price,sell));
+					console.log('Stop loss', pair, stopPrice, sellPrice);
+					binance.sell(pair+"BTC", quantity, sellPrice, {stopPrice: stopPrice, type: "STOP_LOSS_LIMIT"}, (error, response) => {
 						if(error) console.log('error', error.body)
 						console.log("Stop loss response", response);
 						console.log("order id: " + response.orderId);
-					});
-				});				
-			});
+						const riskOrder = response.orderId;
+						result.risk = stopPrice;
+						const add = math.round(price * reward, 8);
+						const sellLimit = checkPrice(info[pair+"BTC"], math.sum(price,add));
+						console.log('Sell limit', pair, sellLimit);
+						binance.sell(pair+"BTC", quantity, sellLimit, {type:'LIMIT'}, (error, response) => {
+							if(error) console.log('error', error.body)
+							console.log("Stop loss response", response);
+							console.log("order id: " + response.orderId);
+							const rewardOrder = response.orderId;
+							result.reward = sellLimit;
+							tracked_pairs.push({ 
+								symbol: pair+"BTC", 
+								date: moment().format('MMMM Do YYYY, h:mm:ss a'),
+								timestamp: Date.now(),
+								quantity: quantity,
+								buy: price,
+								buyOrder: buyOrder,
+								stop: stopPrice,
+								risk: sellPrice,
+								riskOrder: riskOrder,
+								reward: sellLimit,
+								rewardOrder: rewardOrder
+							});
+							resolve(result);
+						});
+					});				
+				});
+			}
 		}
-	}
+	});
 }
 
 function calculateCoinInfo(info, signal) {

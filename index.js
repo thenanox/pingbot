@@ -9,11 +9,12 @@ const trader = require('./binance');
 
 const PORT = process.env.PORT || 5000
 const signalsCache = [];
+const tradesCache = [];
 
 trader.run();
 module.exports = server({ security: { csrf: false }, port: PORT }, [
   get('/', ctx => 'Hello world'),
-  post('/', ctx => {
+  post('/', async ctx => {
     console.log('headers', ctx.headers);
     if(ctx.headers['user-agent'] !== 'CryptoPingAPI/0.1.1') {
       return status('400');
@@ -28,7 +29,8 @@ module.exports = server({ security: { csrf: false }, port: PORT }, [
       signalsCache.shift();
     }
     if(signal.type === 'up') {
-      trader.open(signal);
+      const result = await trader.open(signal);
+      tradesCache.push(result);
     } else {
       trader.close(signal);
     }
@@ -37,6 +39,9 @@ module.exports = server({ security: { csrf: false }, port: PORT }, [
   get('/signals', ctx => {
     const result = signalsCache.map(signal => signal.prettyPrinted());
     return json(result);
+  }),
+  get('/trades', ctx => {
+    return json(tradesCache);
   }),
   get('/signals/clear', ctx => {
     signalsCache.length = 0;
